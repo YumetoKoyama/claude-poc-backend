@@ -1,0 +1,165 @@
+name: Claude - Issue から実装・PR作成
+
+# Issue に @claude と書いてコメントすることで、Claude Code が
+#   1. feature ブランチを作成
+#   2. implement-loop スキルで produce(implement-from-issue) → review → fix を
+#      BLOCK 0 まで反復（最大 3 周）して実装・テスト
+#   3. PR を作成
+# を自動実行する。
+#
+# 必要シークレット:
+#   CLAUDE_CODE_OAUTH_TOKEN  ... Claude Code の OAuth トークン
+#   CLAUDE_GITHUB_PAT        ... Claude のコミット/push で CI を再トリガーするための PAT
+#                                (GITHUB_TOKEN はデフォルトで CI を起動しないため PAT が必要)
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+  actions: read
+
+jobs:
+  claude-implement:
+    # PR コメントではなく Issue コメントに限定し、かつ @claude を含む場合のみ実行
+    if: |
+      github.event.issue.pull_request == null &&
+      contains(github.event.comment.body, '@claude')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # 6.0.0
+        with:
+          token: ${{ secrets.CLAUDE_GITHUB_PAT }}
+          fetch-depth: 0
+
+      - name: docs リポジトリのチェックアウト（設計書参照用・読み取り専用）
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # 6.0.0
+        with:
+          repository: ${{ github.repository_owner }}/claude-poc-docs
+          token: ${{ secrets.CLAUDE_GITHUB_PAT }}
+          path: claude-poc-docs
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+          cache: 'maven'
+
+      - name: Claude Code - Issue から実装・PR作成
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # PAT を使うことで Claude のコミット/push が CI ワークフローを再トリガーする
+          github_token: ${{ secrets.CLAUDE_GITHUB_PAT }}
+          claude_args: "--max-turns 200"  # implement-loop（produce→review→fix×3）に対応できる上限
+          show_full_output: true
+          # Issue コメントの内容をそのまま受け取り、implement-loop スキルでループ実行する
+          prompt: |
+            GitHub Issue #${{ github.event.issue.number }} への対応を開始してください。
+
+            コメント内容:
+            ${{ github.event.comment.body }}
+
+            以下の手順で実行してください:
+            1. gh issue view で Issue 本文を確認し、本文に「実施手順」セクションがある場合は**それに従う**
+            2. 実施手順が無い通常の実装 Issue の場合は /implement-loop ${{ github.event.issue.number }} を実行する
+               （produce=implement-from-issue → review-implementation → fix-implementation を
+               　レビュー BLOCK 件数が 0 になるか上限 3 周に達するまで自動で反復する）
+            3. いずれの場合もブランチ作成・実装・品質ゲート・レビュー・修正・PR 作成まで一気通貫で行い、
+               作業完了後に Issue #${{ github.event.issue.number }} へコメントで結果を報告する
+               （ループが上限到達で未解決 BLOCK が残った場合は、その旨と一覧を Issue へ報告する）
+            4. **/implement-loop の起動自体に失敗した場合（「Error: Execute skill」等）は、
+               implement-from-issue など個別スキルへのフォールバックを一切行わず、その場で中断して
+               Issue へ「ループ起動失敗」とエラー内容を報告すること（レビュー無しの PR 作成を防ぐため）
+          # Claude Code Action が使用するツール権限
+          settings: |
+            {
+              "permissions": {
+                "allow": [
+                  "Write(*)",
+                  "Edit(*)",
+                  "Bash(git checkout:*)",
+                  "Bash(git pull:*)",
+                  "Bash(git fetch:*)",
+                  "Bash(git merge:*)",
+                  "Bash(git push:*)",
+                  "Bash(git add:*)",
+                  "Bash(git commit:*)",
+                  "Bash(git branch:*)",
+                  "Bash(git log:*)",
+                  "Bash(git diff:*)",
+                  "Bash(git status:*)",
+                  "Bash(cat:*)",
+                  "Bash(ls:*)",
+                  "Bash(find:*)",
+                  "Bash(grep:*)",
+                  "Bash(mkdir:*)",
+                  "Bash(gh pr create:*)",
+                  "Bash(gh pr view:*)",
+                  "Bash(gh pr list:*)",
+                  "Bash(gh pr comment:*)",
+                  "Bash(gh issue view:*)",
+                  "Bash(gh issue comment:*)",
+                  "Bash(gh issue edit:*)",
+                  "Bash(gh issue list:*)",
+                  "Bash(gh run view:*)",
+                  "Bash(git apply:*)",
+                  "Bash(git stash:*)",
+                  "Bash(git cat-file:*)",
+                  "Bash(git hash-object:*)",
+                  "Bash(git version:*)",
+                  "Bash(base64:*)",
+                  "Bash(wc:*)",
+                  "Bash(mvn:*)",
+                  "Bash(npm:*)",
+                  "Bash(npx:*)",
+                  "Skill",
+                  "Bash(bash:*)"
+                ]
+              }
+            }
+
+      # ── 構造的課題②への対応 ──────────────────────────────────────────
+      # Claude の自己申告に依存しない決定論チェック。implement-loop が黙って
+      # 不完全終了した場合（レビュー未実行・ゲート未通過のまま PR 作成）を検出して
+      # ジョブを失敗させ、Issue に警告コメントを残す。
+      - name: 成果物検証（レビュー証跡・テスト設計ゲート / Claude 非依存）
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.CLAUDE_GITHUB_PAT }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          set -uo pipefail
+          BR="feature/issue-${ISSUE}"
+          if ! git fetch origin "$BR" 2>/dev/null; then
+            echo "feature ブランチ未作成のため検証をスキップ（実装未着手・中断のケース）"
+            exit 0
+          fi
+          git checkout "$BR"
+          MSG=""
+          if [ ! -f "docs/test/レビュー結果/implement-issue-${ISSUE}.md" ]; then
+            MSG="${MSG}- レビュー証跡 \`docs/test/レビュー結果/implement-issue-${ISSUE}.md\` が存在しない（review-implementation 未実行の疑い）\n"
+          fi
+          if ! bash .claude/skills/_common/scripts/check-test-matrix.sh docs/test "$ISSUE" unit; then
+            MSG="${MSG}- テスト設計ゲート（check-test-matrix.sh unit）不合格\n"
+          fi
+          if [ -n "$MSG" ]; then
+            {
+              echo "## ⚠️ 成果物検証 NG（CI 自動チェック・Claude 非依存）"
+              echo ""
+              echo "Issue #${ISSUE} の implement-loop 成果物に不備を検出しました:"
+              echo ""
+              printf '%b' "$MSG"
+              echo ""
+              echo "PR はマージしないでください。レビュー工程（review-implementation）が実行されたか、ログを確認してください。"
+            } | gh issue comment "$ISSUE" --body-file - || true
+            exit 1
+          fi
+          echo "成果物検証 OK（レビュー証跡・テスト設計ゲート）"

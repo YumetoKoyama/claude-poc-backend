@@ -1,0 +1,429 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  確定表対応 pom.xml
+  確定表(backend-00-stack.md)の #1〜#13 を物理化したビルド定義。
+  - 品質ゲート(JaCoCo/Checkstyle/PMD/SpotBugs)はすべて verify フェーズに束縛し、
+    個別ゴールの CLI 直叩き(default-cli)を排除する → `mvn verify` 一発で全ゲートが走る。
+  - 静的解析の設定は config/ 配下の固定ファイルを参照（実装での都度生成を禁止）。
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- #3 #4 Spring Boot 3.5.14（モジュラモノリス） -->
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.5.14</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>com.example</groupId>
+  <artifactId>logistics-matching</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <packaging>jar</packaging>
+  <name>logistics-matching</name>
+  <description>配送マッチング Web アプリ バックエンド（demo 第1版）</description>
+
+  <properties>
+    <!-- #2 Java 25 -->
+    <java.version>25</java.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+    <!-- #12 静的解析ツールの版を一元管理
+         ※ 下記は Java 25 で `mvn verify` 緑を実機確認した確定値（2026-06-09, JDK 25.0.3）。
+            PMD/SpotBugs は旧版が Java 25 バイトコード（class 69）を解析できず落ちるため、
+            ここに記載のバージョン以上を維持すること。 -->
+    <checkstyle.plugin.version>3.6.0</checkstyle.plugin.version>
+    <checkstyle.core.version>10.21.4</checkstyle.core.version>
+    <pmd.plugin.version>3.26.0</pmd.plugin.version>
+    <pmd.core.version>7.25.0</pmd.core.version>      <!-- 7.10.0 は class 69 非対応。7.25.0 で確認済み -->
+    <spotbugs.plugin.version>4.9.8.4</spotbugs.plugin.version> <!-- 4.8.x は非対応。4.9.8.4 で確認済み -->
+
+    <!-- #13 JaCoCo: Java 25（class 69）対応版が必須。0.8.12 は version 69 を解析できず落ちる。
+         0.8.15 で緑を確認済み。 -->
+    <jacoco.version>0.8.15</jacoco.version>
+    <jacoco.instruction.min>1.00</jacoco.instruction.min>
+    <jacoco.branch.min>0.90</jacoco.branch.min>
+
+    <jjwt.version>0.12.6</jjwt.version>
+
+    <!-- OpenAPI Generator: docs/design/api/*.yaml → target/generated-sources/openapi/
+         ローカルは親アンブレラ相対のデフォルトパスを使用。
+         CI など別パスの場合は -Dopenapi.spec.basedir=/path/to/api で上書き可能。 -->
+    <openapi.generator.version>7.13.0</openapi.generator.version>
+    <openapi.spec.basedir>${project.basedir}/../claude-poc-docs/docs/design/api</openapi.spec.basedir>
+  </properties>
+
+  <dependencies>
+    <!-- #3 Web(REST API) -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <!-- #6 Spring Data JPA -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+    <!-- #9 Spring Security -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+    <!-- バリデーション（共通部品: 入力チェック） -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+    <!-- 運用設計: actuator health -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+    <!-- #7 PostgreSQL 16 ドライバ -->
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+
+    <!-- 共通部品 JwtUtil 用 JWT ライブラリ -->
+    <dependency>
+      <groupId>io.jsonwebtoken</groupId>
+      <artifactId>jjwt-api</artifactId>
+      <version>${jjwt.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.jsonwebtoken</groupId>
+      <artifactId>jjwt-impl</artifactId>
+      <version>${jjwt.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.jsonwebtoken</groupId>
+      <artifactId>jjwt-jackson</artifactId>
+      <version>${jjwt.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+
+    <!-- Lombok（任意・コンパイル時のみ） -->
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <!-- SpotBugs アノテーション（@SuppressFBWarnings の個別付与用） -->
+    <dependency>
+      <groupId>com.github.spotbugs</groupId>
+      <artifactId>spotbugs-annotations</artifactId>
+      <version>4.8.6</version>
+      <optional>true</optional>
+    </dependency>
+
+    <!-- #10 単体テスト: JUnit5 + Mockito + AssertJ（starter-test 同梱） -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- #11 結合テスト: Testcontainers(PostgreSQL 16) -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-testcontainers</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- #20 AWS SES メール送信（EXT-001） -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>ses</artifactId>
+      <version>2.31.41</version>
+    </dependency>
+
+    <!-- #20 Spring Retry（SES 一時エラー リトライ最大3回・バックオフ 1s/2s/4s） -->
+    <dependency>
+      <groupId>org.springframework.retry</groupId>
+      <artifactId>spring-retry</artifactId>
+    </dependency>
+    <!-- Spring Retry が AOP を必要とする -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-aop</artifactId>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!-- #5 Spring Boot Maven Plugin -->
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <configuration>
+          <excludes>
+            <exclude>
+              <groupId>org.projectlombok</groupId>
+              <artifactId>lombok</artifactId>
+            </exclude>
+          </excludes>
+        </configuration>
+      </plugin>
+
+      <!-- #13 JaCoCo: prepare-agent / report / check を verify までに束縛 -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>${jacoco.version}</version>
+        <configuration>
+          <excludes>
+            <!-- 各除外に理由コメント必須（CLAUDE.md / 確定表 #13） -->
+            <exclude>**/dto/**</exclude>             <!-- DTO/Lombok 自動生成。ロジックなし -->
+            <exclude>**/entity/**</exclude>          <!-- JPA エンティティ。getter/setter 自動生成 -->
+            <exclude>**/*JpaEntity.class</exclude>   <!-- 命名規約に従った JPA エンティティ。getter/setter 自動生成・フレームワーク接着層 -->
+            <exclude>**/config/**</exclude>          <!-- 設定クラス。フレームワーク接着層 -->
+            <exclude>**/*Application.class</exclude> <!-- main 起動クラス -->
+            <exclude>**/presentation/request/**</exclude>  <!-- Request DTO。Bean Validation アノテーションのみ・ロジックなし -->
+            <exclude>**/presentation/response/**</exclude> <!-- Response DTO。フィールド定義とファクトリメソッドのみ・フレームワーク接着層 -->
+            <exclude>**/*HistoryItem.class</exclude> <!-- 読み取り専用クエリ結果レコード。JPA コンストラクタ式用 DTO -->
+            <exclude>**/infrastructure/persistence/ApplicationQueryRepository.class</exclude> <!-- JPQL/EntityManager 直接操作のインフラ接着層。DB 依存のためテストは結合テストで実施 -->
+            <exclude>**/presentation/request/**</exclude>   <!-- Request DTO。getter/setter のみ。バリデーションアノテーション付与の宣言クラスで業務ロジックなし -->
+            <exclude>**/presentation/response/**</exclude>  <!-- Response DTO。getter/setter のみ。業務ロジックなし -->
+            <exclude>**/TokenHashService.class</exclude> <!-- SHA-256 catch(NoSuchAlgorithmException) は JVM 必須実装のため到達不能コード。テスト不可な防御的例外処理 -->
+            <exclude>**/generated/**</exclude>          <!-- openapi-generator 自動生成クラス。ロジックなし -->
+          </excludes>
+        </configuration>
+        <executions>
+          <execution>
+            <id>prepare-agent</id>
+            <goals><goal>prepare-agent</goal></goals>
+          </execution>
+          <execution>
+            <id>report</id>
+            <phase>test</phase>
+            <goals><goal>report</goal></goals>
+          </execution>
+          <execution>
+            <id>check</id>
+            <phase>verify</phase>
+            <goals><goal>check</goal></goals>
+            <configuration>
+              <rules>
+                <rule>
+                  <element>BUNDLE</element>
+                  <limits>
+                    <limit>
+                      <counter>INSTRUCTION</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>${jacoco.instruction.min}</minimum>
+                    </limit>
+                    <limit>
+                      <counter>BRANCH</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>${jacoco.branch.min}</minimum>
+                    </limit>
+                  </limits>
+                </rule>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- #12 Checkstyle（verify 束縛・config 固定） -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <version>${checkstyle.plugin.version}</version>
+        <dependencies>
+          <dependency>
+            <groupId>com.puppycrawl.tools</groupId>
+            <artifactId>checkstyle</artifactId>
+            <version>${checkstyle.core.version}</version>
+          </dependency>
+        </dependencies>
+        <configuration>
+          <configLocation>config/checkstyle.xml</configLocation>
+          <suppressionsLocation>config/checkstyle-suppressions.xml</suppressionsLocation>
+          <includeTestSourceDirectory>true</includeTestSourceDirectory>
+          <consoleOutput>true</consoleOutput>
+          <failsOnError>true</failsOnError>
+          <violationSeverity>warning</violationSeverity>
+        </configuration>
+        <executions>
+          <execution>
+            <id>checkstyle-check</id>
+            <phase>verify</phase>
+            <goals><goal>check</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- #12 PMD（verify 束縛・PMD7 ruleset 固定） -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-pmd-plugin</artifactId>
+        <version>${pmd.plugin.version}</version>
+        <dependencies>
+          <dependency>
+            <groupId>net.sourceforge.pmd</groupId>
+            <artifactId>pmd-core</artifactId>
+            <version>${pmd.core.version}</version>
+          </dependency>
+          <dependency>
+            <groupId>net.sourceforge.pmd</groupId>
+            <artifactId>pmd-java</artifactId>
+            <version>${pmd.core.version}</version>
+          </dependency>
+        </dependencies>
+        <configuration>
+          <rulesets>
+            <ruleset>config/pmd-ruleset.xml</ruleset>
+          </rulesets>
+          <includeTests>false</includeTests>
+          <printFailingErrors>true</printFailingErrors>
+          <failOnViolation>true</failOnViolation>
+          <excludeRoots>
+            <excludeRoot>${project.build.directory}/generated-sources/openapi</excludeRoot>
+          </excludeRoots>
+        </configuration>
+        <executions>
+          <execution>
+            <id>pmd-check</id>
+            <phase>verify</phase>
+            <goals><goal>check</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- #12 SpotBugs（verify 束縛・除外フィルタ固定） -->
+      <plugin>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-maven-plugin</artifactId>
+        <version>${spotbugs.plugin.version}</version>
+        <configuration>
+          <effort>Max</effort>
+          <threshold>Medium</threshold>
+          <excludeFilterFile>config/spotbugs-exclude.xml</excludeFilterFile>
+          <failOnError>true</failOnError>
+        </configuration>
+        <executions>
+          <execution>
+            <id>spotbugs-check</id>
+            <phase>verify</phase>
+            <goals><goal>check</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- openapi.spec.basedir → file:// URI 変換（Windows パスのバックスラッシュ対策）
+           ${project.basedir} は Windows で C:\... 形式になり java.net.URI で IllegalArgumentException が発生する。
+           Ant の <makeurl> は File.toURI() を内部使用し OS を問わず正しい file:///C:/... / file:///home/... 形式を生成する。
+           生成した URI は openapi.spec.uri プロパティに格納し openapi-generator が inputSpec として利用する。 -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <version>3.1.0</version>
+        <executions>
+          <execution>
+            <id>normalize-openapi-spec-path</id>
+            <phase>initialize</phase>
+            <goals><goal>run</goal></goals>
+            <configuration>
+              <target>
+                <makeurl property="openapi.spec.uri" file="${openapi.spec.basedir}"/>
+              </target>
+              <exportAntProperties>true</exportAntProperties>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- OpenAPI Generator: docs/design/api/*.yaml → target/generated-sources/openapi/
+           generate-sources フェーズで自動実行（mvn compile / mvn verify に統合）。
+           手動実行: bash scripts/gen-api-models.sh
+           CI での別パス指定: -Dopenapi.spec.basedir=/path/to/api
+           生成物は target/ 配下のため gitignore 対象（コミット不要）。
+           Checkstyle・PMD・SpotBugs・JaCoCo は generated パッケージを除外済み。 -->
+      <plugin>
+        <groupId>org.openapitools</groupId>
+        <artifactId>openapi-generator-maven-plugin</artifactId>
+        <version>${openapi.generator.version}</version>
+        <configuration>
+          <!-- 各 execution が inputSpec のみ上書きし、残りはここから継承する -->
+          <generatorName>spring</generatorName>
+          <output>${project.build.directory}/generated-sources/openapi</output>
+          <modelPackage>com.example.logisticsmatching.generated.openapi</modelPackage>
+          <generateApis>false</generateApis>
+          <generateModels>true</generateModels>
+          <generateSupportingFiles>false</generateSupportingFiles>
+          <!-- カスタム Mustache テンプレート: pojo.mustache で x-sensitive / format:password → WRITE_ONLY + ログマスク を自動付与 -->
+          <templateDirectory>${project.basedir}/src/main/resources/openapi-templates</templateDirectory>
+          <configOptions>
+            <useSpringBoot3>true</useSpringBoot3>
+            <useBeanValidation>true</useBeanValidation>
+            <performBeanValidation>false</performBeanValidation>
+            <openApiNullable>false</openApiNullable>
+            <hideGenerationTimestamp>true</hideGenerationTimestamp>
+            <!-- swagger-annotations / springdoc 依存を追加せず済むよう @Schema 生成を無効化 -->
+            <!-- documentationProvider=springdoc(SB3デフォルト) は annotationLibrary=none を禁止するため両方 none にする -->
+            <documentationProvider>none</documentationProvider>
+            <annotationLibrary>none</annotationLibrary>
+          </configOptions>
+        </configuration>
+        <executions>
+          <execution>
+            <id>openapi-gen-auth</id>
+            <goals><goal>generate</goal></goals>
+            <configuration><inputSpec>${openapi.spec.uri}/auth.yaml</inputSpec></configuration>
+          </execution>
+          <execution>
+            <id>openapi-gen-bids</id>
+            <goals><goal>generate</goal></goals>
+            <configuration><inputSpec>${openapi.spec.uri}/bids.yaml</inputSpec></configuration>
+          </execution>
+          <execution>
+            <id>openapi-gen-deals</id>
+            <goals><goal>generate</goal></goals>
+            <configuration><inputSpec>${openapi.spec.uri}/deals.yaml</inputSpec></configuration>
+          </execution>
+          <execution>
+            <id>openapi-gen-deliveries</id>
+            <goals><goal>generate</goal></goals>
+            <configuration><inputSpec>${openapi.spec.uri}/deliveries.yaml</inputSpec></configuration>
+          </execution>
+          <execution>
+            <id>openapi-gen-jobs</id>
+            <goals><goal>generate</goal></goals>
+            <configuration><inputSpec>${openapi.spec.uri}/jobs.yaml</inputSpec></configuration>
+          </execution>
+          <execution>
+            <id>openapi-gen-notifications</id>
+            <goals><goal>generate</goal></goals>
+            <configuration><inputSpec>${openapi.spec.uri}/notifications.yaml</inputSpec></configuration>
+          </execution>
+          <execution>
+            <id>openapi-gen-users</id>
+            <goals><goal>generate</goal></goals>
+            <configuration><inputSpec>${openapi.spec.uri}/users.yaml</inputSpec></configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

@@ -1,0 +1,7 @@
+*.sh text eol=lf
+*.java text eol=lf
+/pom.xml text eol=lf
+/config/*.xml text eol=lf
+/src/**/*.xml text eol=lf
+/src/**/*.yml text eol=lf
+/src/**/*.mustache text eol=lf
