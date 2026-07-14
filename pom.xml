@@ -387,6 +387,20 @@
           </configOptions>
         </configuration>
         <executions>
+          <!-- _common.yaml 自体を先に生成する: ErrorResponse / ErrorCode / PageMeta / コード値 enum 等の
+               唯一の正典クラスを本 execution で確定させる。各リソース YAML は operation の responses から
+               `./_common.yaml#/components/schemas/...` を外部ファイル参照するのみで、参照先スキーマを
+               自身の components/schemas に別名登録していないため、そのままでは openapi-generator が
+               参照ごとに operationId+statusCode ベースの重複クラス（例: Login401Response 等）へ
+               インライン展開してしまう（共通スキーマとして再利用されない）。
+               本 execution を最初に実行して共通クラスを確定させ、各リソース実装（GlobalExceptionHandler・
+               PageMetaFactory 等）はここで生成された ErrorResponse/ErrorCode/PageMeta を参照する
+               （各リソース execution が生成する重複インラインクラスは未使用のまま残るが、生成物のため実害はない）。 -->
+          <execution>
+            <id>openapi-gen-common</id>
+            <goals><goal>generate</goal></goals>
+            <configuration><inputSpec>${openapi.spec.uri}/_common.yaml</inputSpec></configuration>
+          </execution>
           <execution>
             <id>openapi-gen-auth</id>
             <goals><goal>generate</goal></goals>
@@ -398,24 +412,34 @@
             <configuration><inputSpec>${openapi.spec.uri}/bids.yaml</inputSpec></configuration>
           </execution>
           <execution>
-            <id>openapi-gen-deals</id>
-            <goals><goal>generate</goal></goals>
-            <configuration><inputSpec>${openapi.spec.uri}/deals.yaml</inputSpec></configuration>
-          </execution>
-          <execution>
-            <id>openapi-gen-deliveries</id>
-            <goals><goal>generate</goal></goals>
-            <configuration><inputSpec>${openapi.spec.uri}/deliveries.yaml</inputSpec></configuration>
-          </execution>
-          <execution>
             <id>openapi-gen-jobs</id>
             <goals><goal>generate</goal></goals>
             <configuration><inputSpec>${openapi.spec.uri}/jobs.yaml</inputSpec></configuration>
           </execution>
           <execution>
+            <id>openapi-gen-negotiations</id>
+            <goals><goal>generate</goal></goals>
+            <configuration><inputSpec>${openapi.spec.uri}/negotiations.yaml</inputSpec></configuration>
+          </execution>
+          <execution>
             <id>openapi-gen-notifications</id>
             <goals><goal>generate</goal></goals>
             <configuration><inputSpec>${openapi.spec.uri}/notifications.yaml</inputSpec></configuration>
+          </execution>
+          <execution>
+            <id>openapi-gen-ratings</id>
+            <goals><goal>generate</goal></goals>
+            <configuration><inputSpec>${openapi.spec.uri}/ratings.yaml</inputSpec></configuration>
+          </execution>
+          <execution>
+            <id>openapi-gen-set-bids</id>
+            <goals><goal>generate</goal></goals>
+            <configuration><inputSpec>${openapi.spec.uri}/set-bids.yaml</inputSpec></configuration>
+          </execution>
+          <execution>
+            <id>openapi-gen-tenants</id>
+            <goals><goal>generate</goal></goals>
+            <configuration><inputSpec>${openapi.spec.uri}/tenants.yaml</inputSpec></configuration>
           </execution>
           <execution>
             <id>openapi-gen-users</id>
