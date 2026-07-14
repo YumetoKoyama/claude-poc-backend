@@ -6,6 +6,7 @@ package com.example.logisticsmatching.auth.domain.service;
  * <p>実装（SMTP/AWS SES 等を用いたアダプタ）は {@code auth/infrastructure/} 側に置く
  * （本 Issue では雛形のみを提供し、実装本体は「[backend] 認証APIの実装」Issue で行う）。
  */
+@FunctionalInterface
 public interface MailSender {
 
     /**

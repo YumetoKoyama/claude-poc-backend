@@ -28,4 +28,10 @@ class SensitiveDataMaskerTest {
     void tc031_doesNotMaskNonSensitiveFields() {
         assertThat(SensitiveDataMasker.mask("companyName", "株式会社サンプル")).isEqualTo("株式会社サンプル");
     }
+
+    @Test
+    @DisplayName("TC-031（境界値）: フィールド名が null の場合は非機微情報として値をそのまま返す")
+    void tc031_nullFieldNameIsNotMasked() {
+        assertThat(SensitiveDataMasker.mask(null, "value")).isEqualTo("value");
+    }
 }

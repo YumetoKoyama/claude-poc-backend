@@ -15,7 +15,7 @@ public final class SensitiveDataMasker {
     private static final Set<String> SENSITIVE_FIELD_NAMES =
             Set.of("password", "token", "name", "phone", "email");
 
-    private SensitiveDataMasker() {}
+    private SensitiveDataMasker() { }
 
     public static String mask(String fieldName, String value) {
         if (fieldName != null && SENSITIVE_FIELD_NAMES.contains(fieldName)) {

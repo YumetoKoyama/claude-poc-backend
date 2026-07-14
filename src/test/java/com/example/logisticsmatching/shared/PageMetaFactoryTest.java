@@ -33,6 +33,14 @@ class PageMetaFactoryTest {
     }
 
     @Test
+    @DisplayName("TC-034（境界値）: size が 0 以下の場合は 0 除算を避け totalPages=0 として算出される")
+    void tc034_zeroSize() {
+        PageMeta meta = PageMetaFactory.of(1, 0, 10);
+
+        assertThat(meta.getTotalPages()).isEqualTo(0);
+    }
+
+    @Test
     @DisplayName("TC-034（境界値）: ちょうど1ページ分の件数は totalPages=1 として算出される")
     void tc034_exactlyOnePage() {
         PageMeta meta = PageMetaFactory.of(1, 20, 20);

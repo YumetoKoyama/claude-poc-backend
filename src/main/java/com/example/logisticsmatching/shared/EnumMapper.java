@@ -9,7 +9,7 @@ package com.example.logisticsmatching.shared;
  */
 public final class EnumMapper {
 
-    private EnumMapper() {}
+    private EnumMapper() { }
 
     public static <T extends Enum<T>> T map(Enum<?> source, Class<T> targetEnumClass) {
         if (source == null) {

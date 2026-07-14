@@ -4,6 +4,7 @@ package com.example.logisticsmatching.shared.exception;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.logisticsmatching.generated.openapi.ErrorCode;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -132,5 +133,22 @@ class DomainExceptionSubclassesTest {
 
         assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
         assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.RATE_LIMITED);
+    }
+
+    @Test
+    @DisplayName("TC-001: ValidationException(message, null) は details を空リストとして扱う（null 安全）")
+    void tc001_validationException_nullDetailsIsSafe() {
+        ValidationException ex = new ValidationException("bad request", null);
+
+        assertThat(ex.getDetails()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("TC-001（境界値）: ValidationException(message, details) は details をそのまま保持する")
+    void tc001_validationException_withDetails() {
+        ValidationException ex =
+                new ValidationException("bad request", List.of(new ValidationError("field", "reason")));
+
+        assertThat(ex.getDetails()).hasSize(1);
     }
 }

@@ -42,6 +42,17 @@ class TypedIdTest {
     }
 
     @Test
+    @DisplayName("TC-024（境界値）: 同一値を保持する JobId 同士は equals/hashCode が値として一致する")
+    void tc024_jobId_equalsByValue() {
+        JobId a = new JobId(7L);
+        JobId b = new JobId(7L);
+
+        assertThat(a).isEqualTo(b);
+        assertThat(a.hashCode()).isEqualTo(b.hashCode());
+        assertThat(a.value()).isEqualTo(7L);
+    }
+
+    @Test
     @DisplayName("TC-025（権限境界）: 同一の Long 値でも TenantId と UserId は型が異なるため一致しない（誤用防止）")
     void tc025_differentIdTypesAreNeverEqual() {
         TenantId tenantId = new TenantId(1L);

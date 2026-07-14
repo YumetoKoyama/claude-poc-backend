@@ -10,8 +10,10 @@ import com.example.logisticsmatching.generated.openapi.PageMeta;
  */
 public final class PageMetaFactory {
 
-    private PageMetaFactory() {}
+    private PageMetaFactory() { }
 
+    // PMD.ShortMethodName: List.of/Set.of に倣ったファクトリメソッドの慣用名として意図的に短くしている
+    @SuppressWarnings("PMD.ShortMethodName")
     public static PageMeta of(int page, int size, long totalElements) {
         int totalPages = size <= 0 ? 0 : (int) Math.ceil((double) totalElements / size);
 

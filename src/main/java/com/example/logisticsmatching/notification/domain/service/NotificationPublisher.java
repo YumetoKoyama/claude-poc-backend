@@ -9,6 +9,7 @@ import com.example.logisticsmatching.shared.id.TenantId;
  * 通知宛先粒度はテナント単位とする（{@code 共通部品設計.md} §6）。実装（アダプタ）は
  * {@code notification/infrastructure/} 側に別 Issue で置く。
  */
+@FunctionalInterface
 public interface NotificationPublisher {
 
     /**
