@@ -2,6 +2,22 @@
 
 > 最新 round が最上部。各 round は機械可読 JSON を人間向けに整形したもの。
 
+## Round ? — 2026-07-15 02:12 — overall: FAIL（BLOCK 2 / SUGGEST 0 / NIT 1）
+
+| 重大度 | カテゴリ | 該当 | 指摘 | 推奨対応 | 対応状況 |
+|---|---|---|---|---|---|
+| BLOCK | quality_gate | target/.gate-content | 品質ゲートのハッシュサイドカー「target/.gate-content」の記録値（460dea02...）と、現HEAD（75c00ad）に対し bash .claude/skills/_common/scripts/gate-content-hash.sh を再計算した値（0890b634...）が不一致。各レポート（jacoco.exec 09:49:04・checkstyle-result.xml 09:49:08・pmd.xml 09:49:12・spotbugsXml.xml 09:49:25・.gate-content 09:49:54）はいずれも直前コミット e641dd4（09:26:29）時点のコードに対して実行されたものだが、最終コミット75c00ad「SystemClockをshared/infrastructure/clock配下へ移動」は09:51:36とその後に行われており、src/ 配下のファイル移動（SystemClock.java・SystemClockTest.java）を経た現在のコードに対して品質ゲートが再実行されていない。quality-gate-outputs.md が定める「不一致なら category=quality_gate」の判定基準に該当する。 | mvn clean verify（またはプロジェクトの品質ゲート実行コマンド）を現HEADに対して再実行し、bash .claude/skills/_common/scripts/gate-content-hash.sh > target/.gate-content でサイドカーを再生成してから再レビューする。 | 未対応 |
+| BLOCK | security | src/main/resources/openapi-templates/pojo.mustache:269 | pom.xml のコメントは「カスタム Mustache テンプレート: pojo.mustache で x-sensitive / format:password → WRITE_ONLY + ログマスク を自動付与」と明記し、backend-07-security-coding.md §0(a) も「format: password / writeOnly: true / x-sensitive: true → getter に @JsonProperty(access = WRITE_ONLY) + toString() で [MASKED]」を要求するが、実装は toString() のマスク（「***」表記）のみで、getter への @JsonProperty(access = WRITE_ONLY) 付与が一切実装されていない。実際に auth.yaml の LoginRequest.password（writeOnly: true, x-sensitive: true）から生成された target/generated-sources/openapi/.../LoginRequest.java を確認したところ、getter は素の @JsonProperty("password") のみで access 制御が無く、R-SEC-110/111（機密フィールドをレスポンスに含めない防御層）の生成時自動付与が欠落している。 | pojo.mustache の getter 生成部（{{#jackson}} ブロック、{{getter}}() 定義付近）に、{{#isPassword}} と同様に vendorExtensions.x-sensitive / writeOnly を判定し、該当フィールドの @JsonProperty アノテーションに access = JsonProperty.Access.WRITE_ONLY を付与する分岐を追加する。追加後は target/generated-sources を再生成し LoginRequest 等で確認する。 | 未対応 |
+| NIT | typo | docs/test/単体テストマトリクス.md:59 | TC-023 のシナリオ列が「null／空文字で生成」と記載されているが、TenantId/UserId/JobId は Long 型の値オブジェクトであり「空文字」は型として発生し得ない（実テスト TypedIdTest も null のみを検証している）。設計と実コードの記述に軽微な不整合がある。 | シナリオ列を「null で生成」のみに修正するか、Long 型である旨の注記を追加して「空文字」の記載を削除する。 | 未対応 |
+
+検査済み観点: checked 22 / partial 0 / not-checked 3
+
+未カバー領域:
+- dead-field（not-checked）: 本Issueはバックエンド共通部品のみでFE/画面表示項目を伴わないため対象外
+- frontend_convention（not-checked）: バックエンドリポジトリのみの変更でFEファイルは対象外
+- nonfunc_test（not-checked）: 本Issueは横断部品の実装であり、該当する非機能要求値（性能・負荷）の検証対象が非機能テスト計画.mdに存在しない
+
+
 ## Round ? — 2026-07-15 00:40 — overall: FAIL（BLOCK 1 / SUGGEST 0 / NIT 0）
 
 | 重大度 | カテゴリ | 該当 | 指摘 | 推奨対応 | 対応状況 |
