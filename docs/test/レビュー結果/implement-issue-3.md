@@ -2,6 +2,21 @@
 
 > 最新 round が最上部。各 round は機械可読 JSON を人間向けに整形したもの。
 
+## Round ? — 2026-07-15 05:15 — overall: FAIL（BLOCK 1 / SUGGEST 1 / NIT 0）
+
+| 重大度 | カテゴリ | 該当 | 指摘 | 推奨対応 | 対応状況 |
+|---|---|---|---|---|---|
+| BLOCK | quality_gate | target/.gate-content:1 | 品質ゲート（mvn test / JaCoCo / Checkstyle / PMD / SpotBugs）が現在のコードに対して実行されたことを示す内容ハッシュが一致しない。bash .claude/skills/_common/scripts/gate-content-hash.sh の再計算値は「400c24d1...」だが、target/.gate-content に記録された値は「e63d48f1...」であり、直近コミット673eca6（GeneratedModelMaskingTest.java追加・SensitiveDataMasker.javaへのJavadoc追記）を反映したサイドカー更新が行われていない。RC-07の判定ルール上、記録ハッシュと現在のコード内容ハッシュが不一致の場合は「古いコードに対するレポート（内容不一致）」としてBLOCKとする。 | 最終コミット後に品質ゲート（mvn verify等でUT・JaCoCo・Checkstyle・PMD・SpotBugsを実行）を再実行し、bash .claude/skills/_common/scripts/gate-content-hash.sh > target/.gate-content でサイドカーを最終コードに対して更新すること。 | 未対応 |
+| SUGGEST | scope | .claude/skills/_common/scripts/init-state-with-dispatch.sh:1 | Issue #3（バックエンド共通部品）の実装ブランチに、Issue本文の対象ファイルに含まれないオーケストレーション基盤の変更（コミットdf7af3c「親アンブレラから <repo> <Issue番号> でディスパッチ可能にする」による.claude/skills/_common/scripts/init-state-with-dispatch.sh新規追加・.claude/skills/implement-loop/SKILL.md変更）が混入している。mainブランチ（549e2dd）にもこの変更は無く、Issue #3のスコープ外である。 | Issue #3のPRからはオーケストレーション基盤変更を分離し、別PR（feat/implement-loop-dispatch等）として提出する。CLAUDE.mdの「変更は差分が追いやすい加算型を優先し、無関係なファイルは書き換えない」の原則に沿わせる。 | 未対応 |
+
+検査済み観点: checked 23 / partial 0 / not-checked 3
+
+未カバー領域:
+- dead-field（not-checked）: 本Issueはバックエンド共通部品のみでFE/画面表示項目を伴わないため対象外
+- frontend_convention（not-checked）: バックエンドリポジトリのみの変更でFEファイルは対象外
+- nonfunc_test（not-checked）: 本Issueは横断部品の実装であり、該当する非機能要求値（性能・負荷）の検証対象が非機能テスト計画.mdに存在しない
+
+
 ## Round ? — 2026-07-15 04:46 — overall: FAIL（BLOCK 3 / SUGGEST 1 / NIT 0）
 
 | 重大度 | カテゴリ | 該当 | 指摘 | 推奨対応 | 対応状況 |
