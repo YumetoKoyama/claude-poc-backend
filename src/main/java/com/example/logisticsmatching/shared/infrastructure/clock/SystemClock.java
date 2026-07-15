@@ -1,5 +1,6 @@
-package com.example.logisticsmatching.shared.clock;
+package com.example.logisticsmatching.shared.infrastructure.clock;
 
+import com.example.logisticsmatching.shared.clock.Clock;
 import java.time.LocalDateTime;
 import org.springframework.stereotype.Component;
 

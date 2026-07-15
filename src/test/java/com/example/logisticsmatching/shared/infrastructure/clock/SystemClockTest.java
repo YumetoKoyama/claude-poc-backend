@@ -1,5 +1,5 @@
 // TDD: pre-write — 実装前テスト。/implement-from-issue 実行後に全テストが通ることを確認する
-package com.example.logisticsmatching.shared.clock;
+package com.example.logisticsmatching.shared.infrastructure.clock;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
