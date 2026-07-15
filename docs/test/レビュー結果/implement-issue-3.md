@@ -2,6 +2,23 @@
 
 > 最新 round が最上部。各 round は機械可読 JSON を人間向けに整形したもの。
 
+## Round ? — 2026-07-15 00:40 — overall: FAIL（BLOCK 1 / SUGGEST 0 / NIT 0）
+
+| 重大度 | カテゴリ | 該当 | 指摘 | 推奨対応 | 対応状況 |
+|---|---|---|---|---|---|
+| BLOCK | design_mismatch | src/main/java/com/example/logisticsmatching/shared/clock/SystemClock.java:1 | 「共通部品設計.md」§5は`Clock`の配置を「shared/clock/Clock.java（interface）、infrastructure 側に SystemClock 実装」と定めており、`backend-04-package-structure.md`のsharedモジュール構成例も`clock/`配下は「Clock.java # interface のみ」と明記している。しかし実装では`SystemClock`が`shared/clock/`にinterfaceと同居しており、設計書・パッケージ規約の両方に反する。 | SystemClockをinfrastructure相当のパッケージ（例: shared/infrastructure/clock/SystemClock.java、他モジュールのinfrastructure/配下と同様の位置づけ）へ移動し、shared/clock/にはClock.javaのみを残す。 | 未対応 |
+
+検査済み観点: checked 18 / partial 2 / not-checked 4
+
+未カバー領域:
+- dead-field（not-checked）: 本Issueはフロントエンド・API応答の表示消費経路を持たないため対象外（共通部品のみ）。
+- security-baseline（partial）: Clockインターフェース経由の時刻取得は達成。BCryptコスト・JWT失効方針・ログイン試行ロック・メールアダプタ実配線は認証API Issue側の範囲のため本Issueでは未着手（設計上も本Issueの対象外と明記）。
+- security（partial）: OWASP観点のうちXSS対策（@Pattern付与）は実際の業務DTOフィールドがまだ存在しないため対象外。認可（@PreAuthorize）・テナント越境対応もControllerが存在しないため本Issueでは評価不能（後続API Issueで評価）。
+- frontend_convention（not-checked）: バックエンドリポジトリのみの変更のためFE規約は対象外。
+- pagination（not-checked）: 一覧系APIのRepository実装が本Issueに存在しないため評価対象外（PageMetaFactoryは算出ロジックのみで対象外）。
+- nonfunc_test（not-checked）: 本Issueは横断コンポーネントのみで性能・負荷に影響する処理を含まないため、非機能テスト計画との対応付けは対象外と判断。
+
+
 ## Round ? — 2026-07-15 00:12 — overall: FAIL（BLOCK 2 / SUGGEST 0 / NIT 0）
 
 | 重大度 | カテゴリ | 該当 | 指摘 | 推奨対応 | 対応状況 |
