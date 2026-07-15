@@ -5,9 +5,12 @@ import com.example.logisticsmatching.generated.openapi.ErrorResponse;
 import com.example.logisticsmatching.generated.openapi.ErrorResponseDetailsInner;
 import com.example.logisticsmatching.shared.exception.DomainException;
 import com.example.logisticsmatching.shared.exception.ValidationError;
+import jakarta.persistence.OptimisticLockException;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -23,6 +26,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * {@code @ExceptionHandler} を業務例外の種類ごとに増殖させず、{@code DomainException} 1 ハンドラで
  * 型に依存せず処理する（{@code docs/design/共通部品設計.md} §1 参照）。
  *
+ * <p>{@code OptimisticLockException} / {@code OptimisticLockingFailureException}（Spring が
+ * リポジトリ境界・トランザクションコミット時に JPA 例外を変換したもの）・
+ * {@code DataIntegrityViolationException}（DB 一意制約違反等）は、{@code StateConflictException}
+ * 相当として 409 / {@code CONFLICT} にマッピングする（RC-01）。
+ *
  * <p>ログレベルは業務例外（400/401/403/404/409/429 系）を WARN、未捕捉例外を ERROR とする
  * （§4）。未捕捉例外はスタックトレース等の内部情報をレスポンスへ含めず、ログにのみ記録する
  * （R-SEC-040）。
@@ -32,6 +40,8 @@ public class GlobalExceptionHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     private static final String INTERNAL_ERROR_MESSAGE = "サーバー内部でエラーが発生しました。しばらくしてから再度お試しください。";
+    private static final String STATE_CONFLICT_MESSAGE =
+            "相手の状態が変化したため、この操作は完了できません。最新の状態を確認してください。";
 
     @ExceptionHandler(DomainException.class)
     public ResponseEntity<ErrorResponse> handleDomainException(DomainException ex) {
@@ -43,6 +53,21 @@ public class GlobalExceptionHandler {
         body.setDetails(toDetails(ex.getDetails()));
 
         return ResponseEntity.status(ex.getHttpStatus()).body(body);
+    }
+
+    @ExceptionHandler({
+        OptimisticLockingFailureException.class,
+        OptimisticLockException.class,
+        DataIntegrityViolationException.class
+    })
+    public ResponseEntity<ErrorResponse> handleStateConflictException(Exception ex) {
+        LOGGER.warn("State conflict detected: type={}", ex.getClass().getSimpleName(), ex);
+
+        ErrorResponse body = new ErrorResponse();
+        body.setCode(ErrorCode.CONFLICT);
+        body.setMessage(STATE_CONFLICT_MESSAGE);
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

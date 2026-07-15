@@ -9,15 +9,18 @@ import com.example.logisticsmatching.shared.exception.ForbiddenException;
 import com.example.logisticsmatching.shared.exception.NotFoundException;
 import com.example.logisticsmatching.shared.exception.ValidationError;
 import com.example.logisticsmatching.shared.exception.ValidationException;
+import jakarta.persistence.OptimisticLockException;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.MethodParameter;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.MapBindingResult;
 import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.core.MethodParameter;
 
 /**
  * IMPL-02〜IMPL-04: {@code @RestControllerAdvice} による DomainException / バリデーション例外 /
@@ -64,6 +67,42 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getCode()).isEqualTo(ErrorCode.FORBIDDEN);
+    }
+
+    @Test
+    @DisplayName("TC-037: OptimisticLockingFailureException を catch すると 409・code=CONFLICT を返す（StateConflictException 相当）")
+    void tc037_handleStateConflictException_optimisticLockingFailureException() {
+        OptimisticLockingFailureException ex = new OptimisticLockingFailureException("version mismatch");
+
+        ResponseEntity<ErrorResponse> response = handler.handleStateConflictException(ex);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getCode()).isEqualTo(ErrorCode.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("TC-037: jakarta.persistence.OptimisticLockException を catch すると 409・code=CONFLICT を返す（StateConflictException 相当）")
+    void tc037_handleStateConflictException_jpaOptimisticLockException() {
+        OptimisticLockException ex = new OptimisticLockException("version mismatch");
+
+        ResponseEntity<ErrorResponse> response = handler.handleStateConflictException(ex);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getCode()).isEqualTo(ErrorCode.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("TC-037: DataIntegrityViolationException を catch すると 409・code=CONFLICT を返す（StateConflictException 相当）")
+    void tc037_handleStateConflictException_dataIntegrityViolationException() {
+        DataIntegrityViolationException ex = new DataIntegrityViolationException("unique constraint violated");
+
+        ResponseEntity<ErrorResponse> response = handler.handleStateConflictException(ex);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getCode()).isEqualTo(ErrorCode.CONFLICT);
     }
 
     @Test
