@@ -3,13 +3,23 @@
   openapi-generator 7.13.0 の generatorName=spring 標準テンプレート（JavaSpring/pojo.mustache）を
   ベースに、toString() 生成部分のみ変更している（他は完全に標準のまま）。
 
-  変更点: 標準テンプレートは isPassword（format: password）のフィールドのみ "*" でマスクするが、
+  変更点その1: 標準テンプレートは isPassword（format: password）のフィールドのみ "*" でマスクするが、
   本プロジェクトは `_common.yaml` の `x-sensitive: true`（パスワード・トークン・氏名・電話番号・
   メールアドレス等）を持つ全フィールドを toString() 内で "***"（shared.logging.SensitiveDataMasker
   の MASK 定数と同一表記）にマスクする（R-SEC-050、共通部品設計.md §4）。
-  差分は下記 "begin/end x-sensitive masking" コメントの間のみ。再生成時にこのファイルを
-  更新する場合は、まず `unzip -p openapi-generator-<version>.jar JavaSpring/pojo.mustache` で
-  最新の標準テンプレートを取得し、同じ差分を再適用すること。
+  差分は下記 "begin/end x-sensitive masking" コメントの間のみ。
+
+  変更点その2: YAML で `writeOnly: true` が宣言されたフィールド（例: auth.yaml の password・
+  refreshToken リクエスト・token・newPassword）は、getter の @JsonProperty に
+  access = JsonProperty.Access.WRITE_ONLY を自動付与し、レスポンス JSON へ機微値が
+  混入しない防御層とする（backend-07-security-coding.md §0(a)、R-SEC-110/R-SEC-111）。
+  `writeOnly: false`（例: LoginResponse.refreshToken）の x-sensitive フィールドはレスポンスに
+  含める必要があるため対象外（toString() のマスクのみ適用）。差分は下記
+  "begin/end write-only access" コメントの間のみ。
+
+  再生成時にこのファイルを更新する場合は、まず
+  `unzip -p openapi-generator-<version>.jar JavaSpring/pojo.mustache` で最新の標準テンプレートを
+  取得し、同じ差分（上記2箇所）を再適用すること。
 }}
 /**
  * {{description}}{{^description}}{{classname}}{{/description}}{{#isDeprecated}}
@@ -249,7 +259,14 @@ public {{>sealed}}class {{classname}}{{#parent}} extends {{{parent}}}{{/parent}}
   @ApiModelProperty({{#example}}example = "{{{.}}}", {{/example}}{{#required}}required = {{required}}, {{/required}}{{#isReadOnly}}readOnly = {{{isReadOnly}}}, {{/isReadOnly}}value = "{{{description}}}")
   {{/swagger1AnnotationLibrary}}
   {{#jackson}}
+  {{! begin write-only access (IMPL-08, Issue #3): writeOnly:true のフィールドはレスポンスへの混入を防ぐため WRITE_ONLY を付与する }}
+  {{#isWriteOnly}}
+  @JsonProperty(value = "{{baseName}}", access = JsonProperty.Access.WRITE_ONLY)
+  {{/isWriteOnly}}
+  {{^isWriteOnly}}
   @JsonProperty("{{baseName}}")
+  {{/isWriteOnly}}
+  {{! end write-only access }}
   {{#withXml}}
   @JacksonXmlProperty(localName = "{{items.xmlName}}{{^items.xmlName}}{{xmlName}}{{^xmlName}}{{baseName}}{{/xmlName}}{{/items.xmlName}}"{{#isXmlAttribute}}, isAttribute = true{{/isXmlAttribute}}{{#xmlNamespace}}, namespace = "{{.}}"{{/xmlNamespace}})
     {{#isContainer}}
