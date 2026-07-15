@@ -5,8 +5,10 @@
 
   変更点その1: 標準テンプレートは isPassword（format: password）のフィールドのみ "*" でマスクするが、
   本プロジェクトは `_common.yaml` の `x-sensitive: true`（パスワード・トークン・氏名・電話番号・
-  メールアドレス等）を持つ全フィールドを toString() 内で "***"（shared.logging.SensitiveDataMasker
-  の MASK 定数と同一表記）にマスクする（R-SEC-050、共通部品設計.md §4）。
+  メールアドレス等）を持つ全フィールド（isPassword を含む）を toString() 内で "[MASKED]"
+  （backend-07-security-coding.md §0(a) の生成クラス自動マスク表記）にマスクする
+  （R-SEC-050、共通部品設計.md §4）。ログ出力用の shared.logging.SensitiveDataMasker の MASK 定数
+  （"***"）とは表記が異なるが別用途（generated toString() 用 vs ログ出力用）のため統一しない。
   差分は下記 "begin/end x-sensitive masking" コメントの間のみ。
 
   変更点その2: YAML で `writeOnly: true` が宣言されたフィールド（例: auth.yaml の password・
@@ -372,8 +374,8 @@ public {{>sealed}}class {{classname}}{{#parent}} extends {{{parent}}}{{/parent}}
     {{#parent}}
     sb.append("    ").append(toIndentedString(super.toString())).append("\n");
     {{/parent}}
-    {{! begin x-sensitive masking (IMPL-08, Issue #3): password は既定どおり "*"、それ以外の x-sensitive フィールドは "***" でマスクする }}
-    {{#vars}}sb.append("    {{name}}: ").append({{#isPassword}}"*"{{/isPassword}}{{^isPassword}}{{#vendorExtensions.x-sensitive}}"***"{{/vendorExtensions.x-sensitive}}{{^vendorExtensions.x-sensitive}}toIndentedString({{name}}){{/vendorExtensions.x-sensitive}}{{/isPassword}}).append("\n");
+    {{! begin x-sensitive masking (IMPL-08, Issue #3; masking string aligned to backend-07-security-coding.md §0(a) "[MASKED]" per round-2 review): password / x-sensitive フィールドはいずれも "[MASKED]" でマスクする }}
+    {{#vars}}sb.append("    {{name}}: ").append({{#isPassword}}"[MASKED]"{{/isPassword}}{{^isPassword}}{{#vendorExtensions.x-sensitive}}"[MASKED]"{{/vendorExtensions.x-sensitive}}{{^vendorExtensions.x-sensitive}}toIndentedString({{name}}){{/vendorExtensions.x-sensitive}}{{/isPassword}}).append("\n");
     {{/vars}}{{! end x-sensitive masking }}{{#additionalPropertiesType}}
     sb.append("    additionalProperties: ").append(toIndentedString(additionalProperties)).append("\n");
     {{/additionalPropertiesType}}sb.append("}");
