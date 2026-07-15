@@ -2,6 +2,23 @@
 
 > 最新 round が最上部。各 round は機械可読 JSON を人間向けに整形したもの。
 
+## Round ? — 2026-07-15 04:08 — overall: FAIL（BLOCK 1 / SUGGEST 0 / NIT 0）
+
+| 重大度 | カテゴリ | 該当 | 指摘 | 推奨対応 | 対応状況 |
+|---|---|---|---|---|---|
+| BLOCK | design_mismatch | src/main/resources/openapi-templates/pojo.mustache:376 | 正典「.claude/rules/backend-07-security-coding.md」§0(a)（25行目）は「format: password / writeOnly: true / x-sensitive: true」宣言時の toString() 自動生成マスクを「[MASKED]」と明記しているが、本 Issue で追加した pojo.mustache のカスタム toString() 生成部は x-sensitive フィールドを「***」でマスクしている（isPassword のみ「*」）。実際に生成された target/generated-sources/openapi/LoginRequest.java 等 6 クラスも「***」を出力しており、正典の記載値と一致しない。同ファイルの R-SEC-051 の手書き例（293行目付近）は「***」を使っており正典内でも表記が割れているため、正典側の記載修正（/propose-canon-patch）か実装側を「[MASKED]」に合わせるかを明示的に決定し、どちらかへ統一する必要がある。 | pojo.mustache の x-sensitive masking 部（375〜376行目）の出力文字列を「[MASKED]」に変更するか、または正典 backend-07-security-coding.md §0(a) 表・R-SEC-051 の記載を「***」に統一する提案を /propose-canon-patch で起票する。shared.logging.SensitiveDataMasker の MASK 定数（"***"、ログ出力用）は本指摘の対象外（R-SEC-051 の手書き例と整合するため）。 | 未対応 |
+
+検査済み観点: checked 18 / partial 2 / not-checked 4
+
+未カバー領域:
+- dead-field（not-checked）: 本Issueはフロントエンド・API応答の表示消費経路を持たないため対象外（共通部品のみ）。
+- security-baseline（partial）: Clockインターフェース経由の時刻取得は達成。BCryptコスト・JWT失効方針・ログイン試行ロック保存先・メールアダプタ実配線は認証API Issue側の範囲のため本Issueでは対象外（設計上も明記）。x-sensitive/writeOnlyのtoString()自動マスクは実装済みだが出力文字列が正典と不一致（findings参照）。
+- security（partial）: OWASP観点のうちXSS対策（@Pattern付与）・認可（@PreAuthorize）・テナント越境対応はControllerが存在しないため本Issueでは評価不能（後続API Issueで評価）。writeOnlyフィールドのWRITE_ONLYアクセス制御（R-SEC-110/111）は実装・生成コードで確認済み（LoginRequest等6クラス）。
+- frontend_convention（not-checked）: バックエンドリポジトリのみの変更のためFE規約は対象外。
+- pagination（not-checked）: 一覧系APIのRepository実装が本Issueに存在しないため評価対象外（PageMetaFactoryは算出ロジックのみで対象外）。
+- nonfunc_test（not-checked）: 本Issueは横断コンポーネントのみで性能・負荷に影響する処理を含まないため、非機能テスト計画との対応付けは対象外と判断。
+
+
 ## Round ? — 2026-07-15 02:12 — overall: FAIL（BLOCK 2 / SUGGEST 0 / NIT 1）
 
 | 重大度 | カテゴリ | 該当 | 指摘 | 推奨対応 | 対応状況 |
