@@ -2,6 +2,26 @@
 
 > 最新 round が最上部。各 round は機械可読 JSON を人間向けに整形したもの。
 
+## Round ? — 2026-07-15 04:46 — overall: FAIL（BLOCK 3 / SUGGEST 1 / NIT 0）
+
+| 重大度 | カテゴリ | 該当 | 指摘 | 推奨対応 | 対応状況 |
+|---|---|---|---|---|---|
+| BLOCK | quality_gate | target/.gate-content:1 | 品質ゲート（JaCoCo/Checkstyle/PMD/SpotBugs）の対象ハッシュサイドカー「target/.gate-content」の値（e63d48f1...）が、現在のワーキングツリー（HEAD=026d352、main比較のALLOW対象ファイル群）から算出したハッシュ（53bd2f40...）と一致しない。両ハッシュのタイムスタンプを確認したところ、各レポート（checkstyle-result.xml/pmd.xml/spotbugsXml.xml/site/jacoco/jacoco.xml、いずれも13:20〜13:21生成）は最後のソース変更（pojo.mustache、13:11。コミット026d352）より後に生成されており内容的には現行コードを反映している可能性が高いが、「target/.gate-content」自体は13:11より前（11:35）に書かれたまま更新されておらず、RC-07が要求する「内容ハッシュによる機械照合」が成立しない。 | コミット前に必ず「bash .claude/skills/_common/scripts/gate-content-hash.sh > target/.gate-content」をmvn verify直後に実行し、レポート生成とサイドカー更新を同一ステップで行う運用を徹底する。 | 未対応 |
+| BLOCK | coverage | src/main/resources/openapi-templates/pojo.mustache:377 | pojo.mustacheのtoString()マスク機能（x-sensitive→"[MASKED]"）とwriteOnlyフィールドのJsonProperty.Access.WRITE_ONLY自動付与機能（IMPL-08、R-SEC-050/R-SEC-110/R-SEC-111の実体的な実装手段）を検証する単体テストが1件も存在しない（src/test配下にMASKED/WRITE_ONLY/toString/mustacheを参照するテストなし）。この2機能はOpenAPI生成コード（target/generated-sources/openapi/配下、例: LoginRequest.java/LoginResponse.java）に対して働くが、生成パッケージはbackend-04-package-structure.md R-PKG-004によりJaCoCoカバレッジ除外対象であるため、100%カバレッジの機械ゲートでもこの欠落は検出されない構造的な盲点になっている。テンプレートを将来誤って修正しても回帰検知できない。 | 既に生成済みのtarget/generated-sources/openapi/.../LoginRequest.java等（writeOnly/x-sensitiveフィールドを持つクラス）を対象に、生成クラスをリフレクションまたは直接インスタンス化してtoString()が"[MASKED]"を含み実値を含まないこと、およびJackson ObjectMapperでシリアライズした結果にwriteOnlyフィールドが含まれないことを検証するテスト（例: GeneratedDtoMaskingTest）をsrc/test配下に追加する。 | 未対応 |
+| BLOCK | traceability | (commit df7af3c):1 | feature/issue-3ブランチ（main...HEAD、13コミット）に、Issue #3（共通部品実装）と無関係なスキルオーケストレーション基盤の変更（.claude/skills/_common/scripts/init-state-with-dispatch.sh 新規66行、.claude/skills/implement-loop/SKILL.md +10/-2）を追加するコミット「df7af3c feat(implement-loop): 親アンブレラから <repo> <Issue番号> でディスパッチ可能にする」が含まれており、このコミットメッセージにIssue参照（#3 / Refs:）が無い。内容もIssue #3の「対象ファイル（想定）」「実装内容」のいずれにも該当せず、製造フェーズ（実装対象リポジトリのビジネスロジック実装）のスコープ外である。 | 当該コミットをこのfeatureブランチの履歴から分離し、スキル基盤側の変更は別ブランチ/別PRで管理する（rebase等でdf7af3cをIssue #3の変更から除外する）。分離が難しい場合は、コミットメッセージにIssue #3との関係（無関係であること）を明記し、レビュー時に対象外である旨をPR説明に記載する。 | 未対応 |
+| SUGGEST | duplication | src/main/java/com/example/logisticsmatching/shared/logging/SensitiveDataMasker.java:20 | SensitiveDataMasker.mask()は単体テスト（SensitiveDataMaskerTest、TC-031）を持つが、本diffのどの本番コードからも呼び出されておらず（grep結果：定義とテスト以外に参照なし）、未結線のまま放置されている。logback-spring.xmlのコメント（7-8行目）は「機微情報はSensitiveDataMaskerでマスクしてからログ出力する運用とする」と明記しているが、実際に機微情報マスクを実現しているのはpojo.mustacheのtoString()自動マスク機構であり、SensitiveDataMaskerは事実上デッドコードになっている。二重の（片方は結線済み・片方は未結線の）マスク機構が存在することで、将来「個別フィールドをログに直接出力する」コード（例: LOGGER.info("email={}", user.getEmail())）を書く開発者が、SensitiveDataMaskerが実際には呼ばれる保証のないユーティリティだと知らずに安全だと誤認するリスクがある。 | SensitiveDataMaskerを実際の呼び出し箇所（個別フィールドをログ出力する箇所）に結線するか、pojo.mustache側の機構のみで十分と判断するならSensitiveDataMaskerとそのテストを削除し、logback-spring.xmlのコメントをpojo.mustache方式の説明に統一する。 | 未対応 |
+
+検査済み観点: checked 19 / partial 2 / not-checked 4
+
+未カバー領域:
+- dead-field（not-checked）: 本IssueはController・API応答エンドポイントを持たずFE消費経路が存在しないため対象外。
+- security-baseline（partial）: Clockインターフェース経由の時刻取得（SystemClock）を確認。BCryptコスト・JWT失効方針・ログイン試行ロック保存先・メールアダプタ実配線は認証API Issue側の対象であり本Issueに該当コードが無いため評価対象外。
+- security（partial）: OWASP観点のうちハードコードされたシークレット・機微情報のログ/レスポンス直接出力は本diffに該当なしを確認（grep済み）。XSS対策（@Pattern）は業務DTOフィールドが本Issueに存在せず対象外。認可(@PreAuthorize)・テナント越境404/403の実装もControllerが存在しないため評価不能（後続API Issueで評価）。機微情報マスクの実装（pojo.mustache）自体は確認したがテスト未整備のためcoverage findingとして別掲。
+- frontend_convention（not-checked）: バックエンドリポジトリのみの変更でFEファイルは対象外。
+- pagination（not-checked）: 一覧系APIのRepository実装が本Issueに存在しないため評価対象外（PageMetaFactoryは算出ロジックのみ）。
+- nonfunc_test（not-checked）: 本Issueは横断コンポーネントのみで性能・負荷に影響する処理を含まないため、非機能テスト計画との対応付けは対象外と判断。
+
+
 ## Round ? — 2026-07-15 04:08 — overall: FAIL（BLOCK 1 / SUGGEST 0 / NIT 0）
 
 | 重大度 | カテゴリ | 該当 | 指摘 | 推奨対応 | 対応状況 |
