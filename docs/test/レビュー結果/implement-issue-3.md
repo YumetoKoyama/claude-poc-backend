@@ -2,6 +2,22 @@
 
 > 最新 round が最上部。各 round は機械可読 JSON を人間向けに整形したもの。
 
+## Round ? — 2026-07-15 06:03 — overall: FAIL（BLOCK 0 / SUGGEST 1 / NIT 0）
+
+| 重大度 | カテゴリ | 該当 | 指摘 | 推奨対応 | 対応状況 |
+|---|---|---|---|---|---|
+| SUGGEST | test_design | docs/test/単体テストマトリクス.md:77 | 「finalize モードの整合状況」節が「実装済みテストコードの @DisplayName と1行ずつ突合済み」と明記するが、実際の @Test メソッド数と食い違う。実測（target/surefire-reports のTests run合計・grep -c @Test）: DomainExceptionSubclassesTest=15（文書記載13）、TypedIdTest=6（文書記載5）、SensitiveDataMaskerTest=3（文書記載2）、PageMetaFactoryTest=4（文書記載3）。さらに src/test/java/.../generated/openapi/GeneratedModelMaskingTest.java（IMPL-08のx-sensitiveマスク・writeOnly挙動を検証する実機能テスト3件）が表・突合節のいずれにも一切登場せず、TC-IDも未採番のまま存在する。文書が主張する「テストメソッド総数43」に対し実測は51件で、finalizeの確定claimが実コードと一致していない。 | GeneratedModelMaskingTest の3メソッドに新規TC-ID（TC-038〜TC-040等）を採番してマトリクス・RTM双方に追記し、DomainExceptionSubclassesTest/TypedIdTest/SensitiveDataMaskerTest/PageMetaFactoryTestの実メソッド数を再カウントして「テストメソッド総数」の記載を実測値に合わせて修正する。 | 未対応 |
+
+検査済み観点: checked 20 / partial 1 / not-checked 4
+
+未カバー領域:
+- dead-field（not-checked）: 本Issueはフロントエンド・API応答の表示消費経路を持たないため対象外（共通部品のみ）。
+- security-baseline（partial）: Clockインターフェース経由の時刻取得（LocalDateTime.now()直書き禁止）は達成し検証済み。BCryptコスト・JWT失効方針・ログイン試行ロック保存先・メールアダプタ実配線は認証API Issue側の範囲のため本Issueに該当実装コードが無く評価対象外（設計上も明記）。x-sensitive/writeOnlyのtoString()自動マスク（[MASKED]）はbackend-07-security-coding.md §0(a)と一致し、GeneratedModelMaskingTestで実機能検証済み。
+- frontend_convention（not-checked）: バックエンドリポジトリ（claude-poc-backend）のみの変更のためFE規約は対象外。
+- pagination（not-checked）: 一覧系APIのRepository実装が本Issueに存在しないため評価対象外（PageMetaFactoryは算出ロジックのみで対象外）。
+- nonfunc_test（not-checked）: 本Issueは横断コンポーネントのみで性能・負荷に影響する処理を含まないため、非機能テスト計画との対応付けは対象外と判断。
+
+
 ## Round ? — 2026-07-15 05:15 — overall: FAIL（BLOCK 1 / SUGGEST 1 / NIT 0）
 
 | 重大度 | カテゴリ | 該当 | 指摘 | 推奨対応 | 対応状況 |
